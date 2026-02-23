@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Mode MVP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="min-h-screen bg-slate-100 text-slate-900">
+    <main class="mx-auto flex min-h-screen w-full max-w-3xl items-center px-4 py-10">
+      <section class="w-full rounded-2xl bg-white p-6 shadow-lg md:p-8">
+        <div class="mb-8">
+          <h1 class="text-2xl font-bold tracking-tight md:text-3xl">AI Process Mode Selector</h1>
+          <p class="mt-2 text-sm text-slate-600">
+            Stel de variabelen in en zie direct welke werkwijze het best past.
+          </p>
+        </div>
+
+        <div class="space-y-7">
+          <div>
+            <div class="mb-2 flex items-center justify-between gap-3">
+              <label for="humanTime" class="text-sm font-semibold text-slate-700">
+                Human baseline time
+              </label>
+              <span id="humanTimeValue" class="rounded-md bg-slate-100 px-3 py-1 text-sm font-medium">
+                0 min
+              </span>
+            </div>
+            <input
+              id="humanTime"
+              type="range"
+              min="0"
+              max="120"
+              step="1"
+              class="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-200 accent-indigo-600"
+            />
+          </div>
+
+          <div>
+            <div class="mb-2 flex items-center justify-between gap-3">
+              <label for="successProbability" class="text-sm font-semibold text-slate-700">
+                Probability of success
+              </label>
+              <span
+                id="successProbabilityValue"
+                class="rounded-md bg-slate-100 px-3 py-1 text-sm font-medium"
+              >
+                Onwaarschijnlijk (0%)
+              </span>
+            </div>
+            <input
+              id="successProbability"
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              class="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-200 accent-indigo-600"
+            />
+          </div>
+
+          <div>
+            <div class="mb-2 flex items-center justify-between gap-3">
+              <label for="aiTime" class="text-sm font-semibold text-slate-700">
+                AI process time
+              </label>
+              <span id="aiTimeValue" class="rounded-md bg-slate-100 px-3 py-1 text-sm font-medium">
+                0 min
+              </span>
+            </div>
+            <input
+              id="aiTime"
+              type="range"
+              min="0"
+              max="120"
+              step="1"
+              class="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-200 accent-indigo-600"
+            />
+          </div>
+        </div>
+
+        <div class="mt-10 rounded-xl border border-slate-200 bg-slate-50 p-5">
+          <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Result mode</p>
+          <p id="resultMode" class="mt-2 text-2xl font-bold text-indigo-700">Manual</p>
+        </div>
+
+        <div class="mt-6 flex justify-end">
+          <button
+            id="resetButton"
+            type="button"
+            class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+          >
+            Reset defaults
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
