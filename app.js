@@ -5,6 +5,8 @@ const CONFIG = {
     prob: 50,
     ai: 60,
   },
+  urlDebounceMs: 300,
+  copyFeedbackMs: 1500,
   ranges: {
     human: { min: 0, max: 120 },
     prob: { min: 0, max: 100 },
@@ -49,7 +51,11 @@ const elements = {
   modalBackdrop: document.getElementById("modalBackdrop"),
   meaningModal: document.getElementById("meaningModal"),
   tooltipTriggers: Array.from(document.querySelectorAll("[data-tooltip-trigger]")),
+  copyShareLinkButton: document.getElementById("copyShareLinkButton"),
 };
+
+let scheduledUrlWriteId = null;
+let copyFeedbackResetId = null;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -121,18 +127,27 @@ function getValues() {
   };
 }
 
-function updateUrlQuery(values) {
-  const params = new URLSearchParams(window.location.search);
-  params.set("human", String(values.human));
-  params.set("prob", String(values.prob));
-  params.set("ai", String(values.ai));
-  const query = params.toString();
-  const nextUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
-  window.history.replaceState({}, "", nextUrl);
+function normalizeState(state) {
+  return {
+    human: clamp(Math.round(Number(state.human)), CONFIG.ranges.human.min, CONFIG.ranges.human.max),
+    prob: clamp(Math.round(Number(state.prob)), CONFIG.ranges.prob.min, CONFIG.ranges.prob.max),
+    ai: clamp(Math.round(Number(state.ai)), CONFIG.ranges.ai.min, CONFIG.ranges.ai.max),
+  };
 }
 
-function parseParam(params, name, fallback, range) {
-  const rawValue = params.get(name);
+function isDefaultState(state) {
+  return (
+    state.human === CONFIG.defaults.human &&
+    state.prob === CONFIG.defaults.prob &&
+    state.ai === CONFIG.defaults.ai
+  );
+}
+
+function parseStateParam(params, shortName, longName, fallback, range) {
+  const shortValue = params.get(shortName);
+  const longValue = params.get(longName);
+  const rawValue = shortValue !== null && shortValue.trim() !== "" ? shortValue : longValue;
+
   if (rawValue === null || rawValue.trim() === "") return fallback;
 
   const value = Number(rawValue);
@@ -140,13 +155,69 @@ function parseParam(params, name, fallback, range) {
   return clamp(Math.round(value), range.min, range.max);
 }
 
-function getInitialValues() {
+function getStateFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return {
-    human: parseParam(params, "human", CONFIG.defaults.human, CONFIG.ranges.human),
-    prob: parseParam(params, "prob", CONFIG.defaults.prob, CONFIG.ranges.prob),
-    ai: parseParam(params, "ai", CONFIG.defaults.ai, CONFIG.ranges.ai),
+    human: parseStateParam(params, "h", "human", CONFIG.defaults.human, CONFIG.ranges.human),
+    prob: parseStateParam(params, "p", "prob", CONFIG.defaults.prob, CONFIG.ranges.prob),
+    ai: parseStateParam(params, "a", "ai", CONFIG.defaults.ai, CONFIG.ranges.ai),
   };
+}
+
+function buildShareUrl(state) {
+  const normalized = normalizeState(state);
+  const url = new URL(window.location.href);
+
+  if (isDefaultState(normalized)) {
+    url.search = "";
+    return url.toString();
+  }
+
+  const params = new URLSearchParams();
+  params.set("h", String(normalized.human));
+  params.set("p", String(normalized.prob));
+  params.set("a", String(normalized.ai));
+  url.search = params.toString();
+  return url.toString();
+}
+
+function writeStateToUrl(state) {
+  const normalized = normalizeState(state);
+  const url = new URL(window.location.href);
+
+  if (isDefaultState(normalized)) {
+    url.search = "";
+  } else {
+    const params = new URLSearchParams();
+    params.set("h", String(normalized.human));
+    params.set("p", String(normalized.prob));
+    params.set("a", String(normalized.ai));
+    url.search = params.toString();
+  }
+
+  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+  if (nextUrl !== currentUrl) {
+    window.history.replaceState({}, "", nextUrl);
+  }
+}
+
+function clearScheduledUrlWrite() {
+  if (scheduledUrlWriteId !== null) {
+    window.clearTimeout(scheduledUrlWriteId);
+    scheduledUrlWriteId = null;
+  }
+}
+
+function scheduleWriteStateToUrl(state) {
+  clearScheduledUrlWrite();
+  const nextState = { ...state };
+
+  scheduledUrlWriteId = window.setTimeout(() => {
+    writeStateToUrl(nextState);
+    scheduledUrlWriteId = null;
+  }, CONFIG.urlDebounceMs);
 }
 
 function buildExplanation(mode, probabilityLabel, humanBucket, aiBucket) {
@@ -157,7 +228,7 @@ function formatTimeMinutes(value, max) {
   return value >= max ? `${max}+ min` : `${value} min`;
 }
 
-function render() {
+function render(options = {}) {
   const values = getValues();
   const humanBucket = getTimeBucket(values.human);
   const aiBucket = getTimeBucket(values.ai);
@@ -176,17 +247,60 @@ function render() {
   );
 
   setResultStyle(mode);
-  updateUrlQuery(values);
+
+  if (options.immediateUrlSync) {
+    clearScheduledUrlWrite();
+    writeStateToUrl(values);
+  } else {
+    scheduleWriteStateToUrl(values);
+  }
 }
 
 function applyDefaults() {
   setValues(CONFIG.defaults);
-  render();
+  render({ immediateUrlSync: true });
 }
 
 function applyPreset(presetValues) {
   setValues(presetValues);
-  render();
+  render({ immediateUrlSync: true });
+}
+
+function setCopyButtonLabel(label) {
+  if (!elements.copyShareLinkButton) return;
+  elements.copyShareLinkButton.textContent = label;
+}
+
+function setCopyButtonFeedback(label) {
+  setCopyButtonLabel(label);
+
+  if (copyFeedbackResetId !== null) {
+    window.clearTimeout(copyFeedbackResetId);
+  }
+
+  copyFeedbackResetId = window.setTimeout(() => {
+    setCopyButtonLabel("Copy share link");
+    copyFeedbackResetId = null;
+  }, CONFIG.copyFeedbackMs);
+}
+
+async function copyShareLink() {
+  const shareUrl = buildShareUrl(getValues());
+  let copied = false;
+
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    copied = true;
+  } catch (error) {
+    const tempInput = document.createElement("input");
+    tempInput.value = shareUrl;
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    copied = document.execCommand("copy");
+    document.body.removeChild(tempInput);
+  }
+
+  setCopyButtonFeedback(copied ? "Copied!" : "Copy failed");
 }
 
 function setTooltipVisibility(trigger, isOpen, pinned) {
@@ -299,6 +413,9 @@ function init() {
     applyPreset(CONFIG.presets.collaboration)
   );
   elements.presetManual.addEventListener("click", () => applyPreset(CONFIG.presets.manual));
+  if (elements.copyShareLinkButton) {
+    elements.copyShareLinkButton.addEventListener("click", copyShareLink);
+  }
 
   elements.openMeaning.addEventListener("click", openMeanings);
   elements.closeMeaning.addEventListener("click", closeMeanings);
@@ -313,8 +430,8 @@ function init() {
     }
   });
 
-  setValues(getInitialValues());
-  render();
+  setValues(getStateFromUrl());
+  render({ immediateUrlSync: true });
 }
 
 init();

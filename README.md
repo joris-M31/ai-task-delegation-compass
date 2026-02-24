@@ -45,16 +45,26 @@ Then open [http://localhost:8000](http://localhost:8000).
 - Added a compact expandable **How to use this tool** section.
 - Decision logic, thresholds, presets, slider defaults/ranges, and URL state behavior were not changed.
 
+## Share link behavior update
+
+- Defaults (`60/50/60`) now keep a clean URL with no query string.
+- Non-default state uses short params only: `?h=...&p=...&a=...`.
+- Backward compatibility is preserved for old links (`human/prob/ai`) on load.
+- URL writes are debounced (300ms) while dragging sliders to reduce noisy updates.
+- Added a **Copy share link** button that copies the canonical current URL.
+
 ## Shareable URL state
 
 Slider state is synced to query params:
 
-`?human=60&prob=50&ai=60`
+`?h=90&p=80&a=10`
 
 Behavior:
 
-- On load, the app reads `human`, `prob`, and `ai` from the URL (if present and valid).
-- As sliders move (or presets/reset are used), the URL updates via `history.replaceState` without reloading.
+- On load, the app reads both short (`h/p/a`) and legacy (`human/prob/ai`) params (short wins if both exist).
+- When values are at defaults (`60/50/60`), the URL stays clean with no query string.
+- While dragging sliders, URL updates are debounced (300ms) to reduce noisy changes.
+- Presets and reset still update the URL via `history.replaceState` without reloading.
 
 ## Decision logic
 
